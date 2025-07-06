@@ -1,5 +1,6 @@
+// main.js
 var tool = {
-	toClipboard: function(data, msg) {
+    toClipboard: function(data, msg) {
         var exportBox = $('<textarea style="opacity:0"></textarea>');
         exportBox.val(data);
         $('body').append(exportBox);
@@ -202,6 +203,7 @@ var link = {
 
 var play = {
     currentPlayer: null,
+    currentUrl: null, // 添加当前播放URL
     
     load: function(url) {
         // 销毁之前的播放器实例
@@ -215,7 +217,7 @@ var play = {
         }
         
         // 重置视频元素
-        var playerElement = document.getElementById('real_video_player');
+        var playerElement = document.getElementById('video_player');
         if (playerElement) {
             playerElement.pause();
             playerElement.src = '';
@@ -245,6 +247,9 @@ var play = {
             player.vControl('p+');
             log.add(url);
             console.log('视频资源加载成功');
+            
+            // 更新当前播放URL
+            play.currentUrl = url;
         } catch (e) {
             console.log('找不到视频资源或不支持该视频格式!');
         }
@@ -264,7 +269,7 @@ var play = {
         newPlayer.attr('id', 'real_video_player');
         newPlayer.css({
             width: '100%',
-            height: videoBox.width() / 2 + 'px'
+            height: '100%'
         });
         player.hide();
         newPlayer.touch({
@@ -291,6 +296,14 @@ var play = {
             }
         });
         videoBox.append(newPlayer);
+        
+        // 绑定结束事件 - 修复点2
+        newPlayer[0].addEventListener('ended', function() {
+            if (window.handleVideoEnd) {
+                window.handleVideoEnd();
+            }
+        });
+        
         return newPlayer;
     },
     m3u8: function(url, player) {
@@ -567,8 +580,13 @@ var page = {
         this.instruct();
     }
 };
-
+// 全局播放状态
+window.playState = {
+    currentPlaylist: [],
+    currentIndex: -1,
+    currentUrl: null
+};
 
 $(document).ready(function() {
     page.onload();
-});
+})
