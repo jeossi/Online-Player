@@ -567,6 +567,10 @@ var page = {
         this.instruct();
     }
 };
+document.getElementById('video_player').addEventListener('ended', function() {
+    this.currentTime = 0;
+    this.play();
+});
 
 $(document).ready(function() {
     page.onload();
