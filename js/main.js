@@ -1,5 +1,5 @@
 var tool = {
-    toClipboard: function(data, msg) {
+	toClipboard: function(data, msg) {
         var exportBox = $('<textarea style="opacity:0"></textarea>');
         exportBox.val(data);
         $('body').append(exportBox);
@@ -421,7 +421,7 @@ var log = {
         if (data.length === 0) {
             return '无播放历史';
         }
-        msg = '共' + data.length + '条播放历史(' + (direction === false ? '正序排列):' : '倒序排列):';
+        msg = '共' + data.length + '条播放历史(' + (direction === false ? '正序排列):' : '倒序排列):');
         for (var i = 0; i < data.length; i++) {
             var logIndex = (i + 1) < 10 ? '0' + (i + 1) : (i + 1);
             msg += '\n(' + logIndex + ')\n时间:' + data[i].time + '\n地址:' + data[i].url;
