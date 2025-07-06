@@ -1,5 +1,5 @@
 var tool = {
-    toClipboard: function(data, msg) {
+	toClipboard: function(data, msg) {
         var exportBox = $('<textarea style="opacity:0"></textarea>');
         exportBox.val(data);
         $('body').append(exportBox);
