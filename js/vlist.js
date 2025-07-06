@@ -1,16 +1,6 @@
+// vlist.js
 // 播放列表数据源
 const PLAYLIST_URL = 'https://d.kstore.dev/download/8043/ys/SCjieko.txt';
-
-// 当前状态
-let currentChannel = null;
-let currentCategory = null;
-let channelsData = [];
-let currentEntries = [];
-let currentChannelCategories = {};
-
-// 全局播放状态
-let currentPlaylist = [];
-let currentIndex = -1;
 
 // DOM 元素
 let channelList;
@@ -40,6 +30,7 @@ async function loadChannels() {
         if (!response.ok) throw new Error('网络响应错误');
         
         const textData = await response.text();
+        let channelsData = [];
         
         if (textData.startsWith('#EXTM3U')) {
             channelsData = [{
@@ -98,10 +89,8 @@ function renderChannels(channels) {
 
 // 选择频道
 async function selectChannel(channel) {
-    currentChannel = channel;
-    
     document.querySelectorAll('.channel-item').forEach((item, index) => {
-        if (channelsData[index].name === channel.name) {
+        if (item.textContent === channel.name) {
             item.classList.add('active');
         } else {
             item.classList.remove('active');
@@ -136,7 +125,6 @@ async function selectChannel(channel) {
             throw new Error('未知的格式');
         }
         
-        currentChannelCategories = categories;
         renderCategories(categories);
         
         const firstCategory = Object.keys(categories)[0];
@@ -245,9 +233,6 @@ function renderCategories(categories) {
 
 // 选择分类
 function selectCategory(category, entries) {
-    currentCategory = category;
-    currentEntries = entries;
-    
     document.querySelectorAll('.category-item-container').forEach(item => {
         if (item.textContent === category) {
             item.classList.add('active');
@@ -273,7 +258,7 @@ function renderEntries(entries) {
     entries.forEach((entry, index) => {
         const entryItem = document.createElement('div');
         entryItem.className = 'entry-item';
-        entryItem.dataset.url = entry.url;
+        entryItem.dataset.index = index;
         entryItem.innerHTML = `<div class="entry-name">${entry.name}</div>`;
         
         entryItem.addEventListener('click', () => {
@@ -286,8 +271,8 @@ function renderEntries(entries) {
             entryItem.classList.add('active');
             
             // 更新当前播放列表和索引
-            currentPlaylist = entries;
-            currentIndex = index;
+            window.playState.currentPlaylist = entries;
+            window.playState.currentIndex = index;
             
             // 播放选中的媒体
             playSelectedMedia(entry.url);
@@ -304,50 +289,51 @@ function playSelectedMedia(url) {
     
     // 触发播放按钮点击事件
     document.getElementById('url_btn').click();
-    
-    // 延迟确保播放器初始化后重新绑定事件
-    setTimeout(setupAutoPlay, 500);
 }
 
-// 视频结束事件处理
-function handleVideoEnd() {
-    if (currentPlaylist.length > 0 && currentIndex >= 0) {
-        const nextIndex = (currentIndex + 1) % currentPlaylist.length;
-        const nextEntry = currentPlaylist[nextIndex];
+// 全局视频结束处理函数
+window.handleVideoEnd = function() {
+    const state = window.playState;
+    
+    // 确保有有效的播放列表和当前索引
+    if (!state.currentPlaylist || 
+        state.currentIndex === -1 || 
+        !state.currentPlaylist.length) {
+        return;
+    }
+    
+    // 计算下一个索引
+    const nextIndex = (state.currentIndex + 1) % state.currentPlaylist.length;
+    const nextEntry = state.currentPlaylist[nextIndex];
+    
+    if (nextEntry) {
+        // 更新全局状态
+        state.currentIndex = nextIndex;
         
-        if (nextEntry) {
-            // 更新UI
-            document.querySelectorAll('.entry-item').forEach(item => {
-                item.classList.remove('active');
-            });
-            
-            // 找到并激活下一个条目
-            const nextItem = [...document.querySelectorAll('.entry-item')]
-                .find(item => item.dataset.url === nextEntry.url);
-            
-            if (nextItem) {
-                nextItem.classList.add('active');
-                playSelectedMedia(nextEntry.url);
-                currentIndex = nextIndex;
-            }
+        // 更新UI
+        document.querySelectorAll('.entry-item').forEach(item => {
+            item.classList.remove('active');
+        });
+        
+        // 找到并激活下一个条目
+        const nextItem = document.querySelector(`.entry-item[data-index="${nextIndex}"]`);
+        if (nextItem) {
+            nextItem.classList.add('active');
+            playSelectedMedia(nextEntry.url);
         }
     }
-}
-
-// 自动播放下一首
-function setupAutoPlay() {
-    const videoPlayer = document.getElementById('video_player');
-    
-    if (videoPlayer) {
-        // 移除旧监听器避免重复绑定
-        videoPlayer.removeEventListener('ended', handleVideoEnd);
-        // 添加新监听器
-        videoPlayer.addEventListener('ended', handleVideoEnd);
-    }
-}
+};
 
 // 初始化播放列表
 document.addEventListener('DOMContentLoaded', () => {
+    // 使用全局已存在的播放状态，避免重复初始化
+    if (!window.playState) {
+        window.playState = {
+            currentPlaylist: [],
+            currentIndex: -1,
+            currentUrl: null
+        };
+    }
+    
     initPlaylist();
-    setTimeout(setupAutoPlay, 1000); // 等待1秒确保播放器加载
 })
