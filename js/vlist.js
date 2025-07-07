@@ -309,6 +309,7 @@ window.handleVideoEnd = function() {
     if (nextEntry) {
         // 更新全局状态
         state.currentIndex = nextIndex;
+        state.currentUrl = nextEntry.url; // 更新当前URL
         
         // 更新UI
         document.querySelectorAll('.entry-item').forEach(item => {
