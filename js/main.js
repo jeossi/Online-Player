@@ -203,7 +203,7 @@ var link = {
 
 var play = {
     currentPlayer: null,
-    currentUrl: null, // 添加当前播放URL
+    currentUrl: null,
     
     load: function(url) {
         // 销毁之前的播放器实例
@@ -250,10 +250,16 @@ var play = {
             
             // 更新当前播放URL
             play.currentUrl = url;
+            
+            // 更新全局播放状态
+            if (window.playState) {
+                window.playState.currentUrl = url;
+            }
         } catch (e) {
             console.log('找不到视频资源或不支持该视频格式!');
         }
     },
+    
     init: function(player) {
         if (!player[0]) {
             console.error('play.init(player)参数错误:player必选');
@@ -297,7 +303,7 @@ var play = {
         });
         videoBox.append(newPlayer);
         
-        // 绑定结束事件 - 修复点2
+        // 绑定结束事件 - 确保使用正确的播放器元素
         newPlayer[0].addEventListener('ended', function() {
             if (window.handleVideoEnd) {
                 window.handleVideoEnd();
@@ -580,13 +586,6 @@ var page = {
         this.instruct();
     }
 };
-// 全局播放状态
-window.playState = {
-    currentPlaylist: [],
-    currentIndex: -1,
-    currentUrl: null
-};
-
 $(document).ready(function() {
     page.onload();
 })
