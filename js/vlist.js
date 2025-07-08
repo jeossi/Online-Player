@@ -21,6 +21,133 @@ function initPlaylist() {
     }
     
     loadChannels();
+    
+    // 添加搜索功能
+    setupSearch();
+}
+
+// 设置搜索功能
+function setupSearch() {
+    const searchBtn = document.getElementById('sidebar-search-btn');
+    const searchInput = document.getElementById('sidebar-search-input');
+    const closeBtn = document.querySelector('.close');
+    const modal = document.getElementById('search-results-modal');
+    
+    // 搜索按钮点击事件
+    searchBtn.addEventListener('click', () => {
+        performSearch(searchInput.value.trim());
+    });
+    
+    // 输入框回车事件
+    searchInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            performSearch(searchInput.value.trim());
+        }
+    });
+    
+    // 关闭按钮事件
+    closeBtn.addEventListener('click', () => {
+        modal.style.display = 'none';
+    });
+    
+    // 点击模态框外部关闭
+    window.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            modal.style.display = 'none';
+        }
+    });
+}
+
+// 执行搜索
+function performSearch(keyword) {
+    if (!keyword) {
+        alert('请输入搜索关键词');
+        return;
+    }
+    
+    const modal = document.getElementById('search-results-modal');
+    const resultsContainer = document.getElementById('search-results-container');
+    
+    // 显示加载状态
+    resultsContainer.innerHTML = '<div class="search-loading"><div class="loading-spinner"></div><span>搜索中...</span></div>';
+    modal.style.display = 'block';
+    
+    // 延迟执行搜索，确保UI更新
+    setTimeout(() => {
+        const state = window.playState;
+        let allEntries = [];
+        
+        // 收集当前线路的所有条目
+        if (state.currentChannelData && state.currentChannelData.categories) {
+            for (const category in state.currentChannelData.categories) {
+                if (state.currentChannelData.categories.hasOwnProperty(category)) {
+                    const entries = state.currentChannelData.categories[category];
+                    allEntries = allEntries.concat(entries.map(entry => ({
+                        ...entry,
+                        category: category
+                    })));
+                }
+            }
+        }
+        
+        // 执行搜索
+        const searchResults = allEntries.filter(entry => 
+            entry.name.toLowerCase().includes(keyword.toLowerCase()) ||
+            (entry.category && entry.category.toLowerCase().includes(keyword.toLowerCase()))
+        );
+        
+        // 显示结果
+        displaySearchResults(searchResults, keyword);
+    }, 100);
+}
+
+// 显示搜索结果
+function displaySearchResults(results, keyword) {
+    const resultsContainer = document.getElementById('search-results-container');
+    
+    if (results.length === 0) {
+        resultsContainer.innerHTML = `<div class="no-results">没有找到与 "${keyword}" 相关的内容</div>`;
+        return;
+    }
+    
+    let html = `<div class="search-summary">找到 ${results.length} 个与 "${keyword}" 相关的结果</div>`;
+    html += '<div class="search-results-grid">';
+    
+    results.forEach((entry, index) => {
+        html += `
+            <div class="search-result-item" data-url="${entry.url}">
+                <div class="result-name">${highlightKeyword(entry.name, keyword)}</div>
+                <div class="result-category">分类: ${highlightKeyword(entry.category, keyword)}</div>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    resultsContainer.innerHTML = html;
+    
+    // 添加点击事件
+    document.querySelectorAll('.search-result-item').forEach(item => {
+        item.addEventListener('click', () => {
+            const url = item.getAttribute('data-url');
+            if (url) {
+                playSelectedMedia(url);
+                document.getElementById('search-results-modal').style.display = 'none';
+            }
+        });
+    });
+}
+
+// 高亮关键词
+function highlightKeyword(text, keyword) {
+    if (!text || !keyword) return text;
+    
+    const regex = new RegExp(`(${escapeRegExp(keyword)})`, 'gi');
+    return text.replace(regex, '<span class="highlight">$1</span>');
+}
+
+// 转义正则特殊字符
+function escapeRegExp(string) {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 // 加载线路数据
@@ -59,6 +186,9 @@ async function loadChannels() {
         if (channelsData.length > 0) {
             selectChannel(channelsData[0]);
         }
+        
+        // 保存频道数据到全局状态
+        window.playState.channelsData = channelsData;
     } catch (error) {
         console.error('加载线路数据失败:', error);
         if (channelList) {
@@ -131,6 +261,12 @@ async function selectChannel(channel) {
         if (firstCategory) {
             selectCategory(firstCategory, categories[firstCategory]);
         }
+        
+        // 保存当前频道数据到全局状态
+        window.playState.currentChannelData = {
+            channel: channel,
+            categories: categories
+        };
     } catch (error) {
         console.error('加载分类数据失败:', error);
         if (categoryGrid) {
@@ -332,9 +468,11 @@ document.addEventListener('DOMContentLoaded', () => {
         window.playState = {
             currentPlaylist: [],
             currentIndex: -1,
-            currentUrl: null
+            currentUrl: null,
+            channelsData: [],
+            currentChannelData: null
         };
     }
     
     initPlaylist();
-})
+});
