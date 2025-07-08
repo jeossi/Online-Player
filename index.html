@@ -30,7 +30,10 @@
 				<div id="play_history">
                     <div class="history_header">
                         <div class="history_title">播放历史</div>
-                        <div class="history_clear">X</div>
+                        <div class="history_actions">
+                            <i class="fas fa-times history_close" title="关闭"></i>
+                            <i class="fas fa-trash-alt history_clear" title="清空历史记录"></i>
+                        </div>
                     </div>
                     <div class="history_items"></div>
                 </div>
@@ -48,6 +51,13 @@
 					<div class="sidebar-header">
 						<div class="sidebar-title">
 							<i class="fas fa-list"></i> 播放列表
+						</div>
+						<!-- 添加搜索框 -->
+						<div class="sidebar-search">
+							<input type="text" id="sidebar-search-input" placeholder="搜索视频...">
+							<button id="sidebar-search-btn">
+								<i class="fas fa-search"></i>
+							</button>
 						</div>
 					</div>
 					
@@ -93,6 +103,22 @@
 								</div>
 							</div>
 						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+		
+		<!-- 搜索结果弹窗 -->
+		<div id="search-results-modal" class="modal">
+			<div class="modal-content">
+				<div class="modal-header">
+					<h2>搜索结果</h2>
+					<span class="close">&times;</span>
+				</div>
+				<div class="modal-body" id="search-results-container">
+					<div class="search-loading">
+						<div class="loading-spinner"></div>
+						<span>搜索中...</span>
 					</div>
 				</div>
 			</div>
