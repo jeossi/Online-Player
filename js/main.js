@@ -506,13 +506,20 @@ var page = {
         btn.click(function() {
             play.on();
         });
-        
+        // 修复：更新清除按钮选择器
         $('#play_history .history_clear').click(function(e) {
             e.stopPropagation();
             log.clear();
         });
         
-        $('#play_history .history_items .history_item').mouseover(function(e) {
+        // 添加关闭按钮事件处理
+        $('#play_history .history_close').click(function(e) {
+            e.stopPropagation();
+            $('#play_history').hide();
+        });
+        
+        // 修复：使用事件委托绑定历史记录条目事件
+        $('#play_history .history_items').on('mouseover', '.history_item', function(e) {
             var item = $(this);
             var l = item[0].scrollWidth - item.width();
             var t = -1;
@@ -529,7 +536,7 @@ var page = {
             }
         });
         
-        $('#play_history .history_items .history_item').mouseleave(function(e) {
+        $('#play_history .history_items').on('mouseleave', '.history_item', function(e) {
             var item = $(this);
             if (item.data('animate_timer')) {
                 clearTimeout(item.data('animate_timer'));
@@ -538,7 +545,8 @@ var page = {
             item.scrollLeft(0);
         });
         
-        $('#play_history .history_items .history_item').click(function(e) {
+        // 修复：使用事件委托绑定点击事件
+        $('#play_history .history_items').on('click', '.history_item', function(e) {
             var item = $(this);
             if (item.data('animate_timer')) {
                 clearTimeout(item.data('animate_timer'));
@@ -546,7 +554,10 @@ var page = {
             item.stop();
             item.scrollLeft(0);
             $('#url_box').val(item.text());
-            $('body').click();
+            // 触发播放按钮点击事件
+            $('#url_btn').click();
+            // 隐藏历史记录窗口
+            $('#play_history').hide();
         });
     },
     pretreat: function() {
