@@ -318,22 +318,28 @@ var play = {
             return false;
         }
         this.check(url);
-        player = this.init(player);
         url = link.convert(url);
+        
+        // 尝试使用HLS播放器
         if (Hls.isSupported()) {
-            var hlsPlayer = new Hls();
-            hlsPlayer.loadSource(url);
-            hlsPlayer.attachMedia(player[0]);
-            hlsPlayer.on(Hls.Events.MANIFEST_PARSED, function() {
-                // 播放器加载成功
-            });
-            play.currentPlayer = hlsPlayer;
-        } else {
-            var msg = '浏览器不支持MediaSource Extensions,无法加载M3U8播放器!';
-            console.log(msg);
-            alert(msg);
+            try {
+                player = this.init(player);
+                var hlsPlayer = new Hls();
+                hlsPlayer.loadSource(url);
+                hlsPlayer.attachMedia(player[0]);
+                hlsPlayer.on(Hls.Events.MANIFEST_PARSED, function() {
+                    // 播放器加载成功
+                });
+                play.currentPlayer = hlsPlayer;
+                return player;
+            } catch (e) {
+                console.error('HLS播放器初始化失败:', e);
+            }
         }
-        return player;
+        
+        // 回退到普通video标签
+        console.log('浏览器不支持HLS播放器，尝试使用普通video标签播放');
+        return this.default(url, player);
     },
     flv: function(url, player) {
         if (!url || !player[0]) {
@@ -341,22 +347,28 @@ var play = {
             return false;
         }
         this.check(url);
-        player = this.init(player);
         url = link.convert(url);
+        
+        // 尝试使用FLV播放器
         if (flvjs.isSupported()) {
-            var flvPlayer = flvjs.createPlayer({
-                type: 'flv',
-                url: url
-            });
-            flvPlayer.attachMediaElement(player[0]);
-            flvPlayer.load();
-            play.currentPlayer = flvPlayer;
-        } else {
-            var msg = '浏览器不支持MediaSource Extensions,无法加载Flv播放器!';
-            console.log(msg);
-            alert(msg);
+            try {
+                player = this.init(player);
+                var flvPlayer = flvjs.createPlayer({
+                    type: 'flv',
+                    url: url
+                });
+                flvPlayer.attachMediaElement(player[0]);
+                flvPlayer.load();
+                play.currentPlayer = flvPlayer;
+                return player;
+            } catch (e) {
+                console.error('FLV播放器初始化失败:', e);
+            }
         }
-        return player;
+        
+        // 回退到普通video标签
+        console.log('浏览器不支持FLV播放器，尝试使用普通video标签播放');
+        return this.default(url, player);
     },
     default: function(url, player) {
         if (!url || !player[0]) {
