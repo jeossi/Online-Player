@@ -1,8 +1,8 @@
 /* 基础样式 */
 body {
-    color: #FFFFFF;
+    color: #1b5e20;
     line-height: 1.8;
-    background: linear-gradient(135deg, #1a2a6c, #b21f1f, #1a2a6c);
+    background: linear-gradient(135deg, #e8f5e9, #c8e6c9, #a5d6a7);
     background-size: 400% 400%;
     animation: gradientBG 15s ease infinite;
     margin: 0;
@@ -29,7 +29,7 @@ body {
 
 #logo_box {
     padding: 10px 0;
-    color: #0e90d2;
+    color: #fcaf17;
     text-align: center;
     font-size: 24px;
     font-weight: 800;
