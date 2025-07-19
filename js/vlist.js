@@ -448,13 +448,6 @@ function playSelectedMedia(url) {
 window.handleVideoEnd = function() {
     const state = window.playState;
     
-    // 保存当前全屏状态
-    const isFullscreen = document.fullscreenElement || 
-                         document.webkitFullscreenElement || 
-                         document.mozFullScreenElement || 
-                         document.msFullscreenElement;
-    const wasFullscreen = !!isFullscreen;
-    
     if (state.playMode === 'randomCategory' && state.randomCategoryApi) {
         // 随机分类模式：自动播放下一个随机视频
         const timestamp = new Date().getTime();
@@ -465,16 +458,6 @@ window.handleVideoEnd = function() {
         
         // 播放新视频
         play.load(newUrl);
-        
-        // 恢复全屏状态
-        if (wasFullscreen) {
-            setTimeout(() => {
-                const newPlayer = document.getElementById('real_video_player');
-                if (newPlayer) {
-                    play.requestFullScreen(newPlayer);
-                }
-            }, 500);
-        }
     } else if (state.playMode === 'playlist' && 
                state.currentPlaylist && 
                state.currentIndex !== -1 && 
@@ -498,16 +481,6 @@ window.handleVideoEnd = function() {
             if (nextItem) {
                 nextItem.classList.add('active');
                 playSelectedMedia(nextEntry.url);
-                
-                // 恢复全屏状态
-                if (wasFullscreen) {
-                    setTimeout(() => {
-                        const newPlayer = document.getElementById('real_video_player');
-                        if (newPlayer) {
-                            play.requestFullScreen(newPlayer);
-                        }
-                    }, 500);
-                }
             }
         }
     }
