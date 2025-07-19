@@ -253,6 +253,8 @@ var play = {
                 const playMode = window.playState ? window.playState.playMode : null;
                 indicator.style.display = 
                     (playMode === 'randomCategory') ? 'block' : 'none';
+                
+                console.log('设置连续播放提示:', indicator.style.display, '播放模式:', playMode);
             }
             
             log.add(url);
@@ -641,8 +643,10 @@ $(document).ready(function() {
 // 全局视频结束处理函数
 window.handleVideoEnd = function() {
     const state = window.playState;
+    console.log('视频结束，当前播放模式:', state.playMode, 'API:', state.randomCategoryApi);
     
     if (state.playMode === 'randomCategory' && state.randomCategoryApi) {
+        console.log('执行随机分类连续播放');
         // 随机分类模式：自动播放下一个随机视频
         const timestamp = new Date().getTime();
         const newUrl = state.randomCategoryApi + '?t=' + timestamp;
@@ -656,6 +660,7 @@ window.handleVideoEnd = function() {
                state.currentPlaylist && 
                state.currentIndex !== -1 && 
                state.currentPlaylist.length) {
+        console.log('执行播放列表连续播放');
         // 播放列表模式：播放下一个条目
         const nextIndex = (state.currentIndex + 1) % state.currentPlaylist.length;
         const nextEntry = state.currentPlaylist[nextIndex];
