@@ -205,7 +205,36 @@ var play = {
     currentPlayer: null,
     currentUrl: null,
     
+    // 新增：请求全屏的方法
+    requestFullScreen: function(element) {
+        if (element.requestFullscreen) {
+            element.requestFullscreen();
+        } else if (element.webkitRequestFullscreen) {
+            element.webkitRequestFullscreen();
+        } else if (element.mozRequestFullScreen) {
+            element.mozRequestFullScreen();
+        } else if (element.msRequestFullscreen) {
+            element.msRequestFullscreen();
+        }
+    },
+    
     load: function(url) {
+        // 获取旧的视频元素
+        var oldPlayerElement = document.getElementById('real_video_player');
+        
+        // 保存当前全屏状态
+        var fullscreenElement = document.fullscreenElement || document.webkitFullscreenElement || 
+                               document.mozFullScreenElement || document.msFullscreenElement;
+        var wasFullscreen = false;
+        var wasVideoFullscreen = false;
+        if (fullscreenElement) {
+            wasFullscreen = true;
+            // 检查全屏元素是否是旧的视频元素
+            if (oldPlayerElement && fullscreenElement === oldPlayerElement) {
+                wasVideoFullscreen = true;
+            }
+        }
+        
         // 销毁之前的播放器实例
         if (play.currentPlayer) {
             if (play.currentPlayer.destroy) {
@@ -266,6 +295,18 @@ var play = {
             // 更新全局播放状态
             if (window.playState) {
                 window.playState.currentUrl = url;
+            }
+            
+            // 监听新视频的play事件
+            if (player && player[0]) {
+                var newVideoElement = player[0];
+                var playHandler = function() {
+                    if (wasVideoFullscreen) {
+                        play.requestFullScreen(newVideoElement);
+                    }
+                    newVideoElement.removeEventListener('play', playHandler);
+                };
+                newVideoElement.addEventListener('play', playHandler);
             }
         } catch (e) {
             console.log('找不到视频资源或不支持该视频格式!');
@@ -645,6 +686,13 @@ window.handleVideoEnd = function() {
     const state = window.playState;
     console.log('视频结束，当前播放模式:', state.playMode, 'API:', state.randomCategoryApi);
     
+    // 保存当前全屏状态
+    const isFullscreen = document.fullscreenElement || 
+                         document.webkitFullscreenElement || 
+                         document.mozFullScreenElement || 
+                         document.msFullscreenElement;
+    const wasFullscreen = !!isFullscreen;
+    
     if (state.playMode === 'randomCategory' && state.randomCategoryApi) {
         console.log('执行随机分类连续播放');
         // 随机分类模式：自动播放下一个随机视频
@@ -656,6 +704,16 @@ window.handleVideoEnd = function() {
         
         // 播放新视频
         play.load(newUrl);
+        
+        // 恢复全屏状态
+        if (wasFullscreen) {
+            setTimeout(() => {
+                const newPlayer = document.getElementById('real_video_player');
+                if (newPlayer) {
+                    play.requestFullScreen(newPlayer);
+                }
+            }, 500);
+        }
     } else if (state.playMode === 'playlist' && 
                state.currentPlaylist && 
                state.currentIndex !== -1 && 
@@ -682,6 +740,16 @@ window.handleVideoEnd = function() {
                 // 播放选中的媒体
                 document.getElementById('url_box').value = nextEntry.url;
                 document.getElementById('url_btn').click();
+                
+                // 恢复全屏状态
+                if (wasFullscreen) {
+                    setTimeout(() => {
+                        const newPlayer = document.getElementById('real_video_player');
+                        if (newPlayer) {
+                            play.requestFullScreen(newPlayer);
+                        }
+                    }, 500);
+                }
             }
         }
     }
