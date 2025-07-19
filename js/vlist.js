@@ -377,6 +377,9 @@ function selectCategory(category, entries) {
         }
     });
     
+    // 保存当前分类名称到全局状态
+    window.playState.currentCategory = category;
+    
     renderEntries(entries);
 }
 
@@ -410,6 +413,18 @@ function renderEntries(entries) {
             window.playState.currentPlaylist = entries;
             window.playState.currentIndex = index;
             
+            // 判断当前分类是否为随机分类
+            const isRandomCategory = window.playState.currentCategory && 
+                                    window.playState.currentCategory.includes('随机');
+            
+            // 设置播放模式
+            window.playState.playMode = isRandomCategory ? 'randomCategory' : 'playlist';
+            
+            // 如果是随机分类，保存基础API地址
+            if (isRandomCategory) {
+                window.playState.randomCategoryApi = entry.url.split('?')[0];
+            }
+            
             // 播放选中的媒体
             playSelectedMedia(entry.url);
         });
@@ -431,32 +446,40 @@ function playSelectedMedia(url) {
 window.handleVideoEnd = function() {
     const state = window.playState;
     
-    // 确保有有效的播放列表和当前索引
-    if (!state.currentPlaylist || 
-        state.currentIndex === -1 || 
-        !state.currentPlaylist.length) {
-        return;
-    }
-    
-    // 计算下一个索引
-    const nextIndex = (state.currentIndex + 1) % state.currentPlaylist.length;
-    const nextEntry = state.currentPlaylist[nextIndex];
-    
-    if (nextEntry) {
-        // 更新全局状态
-        state.currentIndex = nextIndex;
-        state.currentUrl = nextEntry.url; // 更新当前URL
+    if (state.playMode === 'randomCategory' && state.randomCategoryApi) {
+        // 随机分类模式：自动播放下一个随机视频
+        const timestamp = new Date().getTime();
+        const newUrl = state.randomCategoryApi + '?t=' + timestamp;
         
-        // 更新UI
-        document.querySelectorAll('.entry-item').forEach(item => {
-            item.classList.remove('active');
-        });
+        // 更新输入框
+        document.getElementById('url_box').value = newUrl;
         
-        // 找到并激活下一个条目
-        const nextItem = document.querySelector(`.entry-item[data-index="${nextIndex}"]`);
-        if (nextItem) {
-            nextItem.classList.add('active');
-            playSelectedMedia(nextEntry.url);
+        // 播放新视频
+        play.load(newUrl);
+    } else if (state.playMode === 'playlist' && 
+               state.currentPlaylist && 
+               state.currentIndex !== -1 && 
+               state.currentPlaylist.length) {
+        // 播放列表模式：播放下一个条目
+        const nextIndex = (state.currentIndex + 1) % state.currentPlaylist.length;
+        const nextEntry = state.currentPlaylist[nextIndex];
+        
+        if (nextEntry) {
+            // 更新全局状态
+            state.currentIndex = nextIndex;
+            state.currentUrl = nextEntry.url;
+            
+            // 更新UI
+            document.querySelectorAll('.entry-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            
+            // 找到并激活下一个条目
+            const nextItem = document.querySelector(`.entry-item[data-index="${nextIndex}"]`);
+            if (nextItem) {
+                nextItem.classList.add('active');
+                playSelectedMedia(nextEntry.url);
+            }
         }
     }
 };
@@ -469,8 +492,11 @@ document.addEventListener('DOMContentLoaded', () => {
             currentPlaylist: [],
             currentIndex: -1,
             currentUrl: null,
+            currentCategory: '',        // 当前选中的分类名称
             channelsData: [],
-            currentChannelData: null
+            currentChannelData: null,
+            playMode: 'playlist',       // 播放模式：'playlist' 或 'randomCategory'
+            randomCategoryApi: ''       // 随机分类的基础API地址
         };
     }
     
