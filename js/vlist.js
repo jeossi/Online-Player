@@ -384,7 +384,6 @@ function selectCategory(category, entries) {
 }
 
 // 渲染条目列表
-// 在渲染条目列表时正确设置播放模式
 function renderEntries(entries) {
     if (!entriesGrid) return;
     
@@ -444,11 +443,37 @@ function playSelectedMedia(url) {
     document.getElementById('url_btn').click();
 }
 
+// 检查是否全屏
+function isFullscreen() {
+    return document.fullscreenElement || 
+           document.webkitFullscreenElement || 
+           document.mozFullScreenElement || 
+           document.msFullscreenElement;
+}
+
+// 请求全屏
+function requestFullscreen(element) {
+    if (element.requestFullscreen) {
+        element.requestFullscreen();
+    } else if (element.webkitRequestFullscreen) {
+        element.webkitRequestFullscreen();
+    } else if (element.mozRequestFullScreen) {
+        element.mozRequestFullScreen();
+    } else if (element.msRequestFullscreen) {
+        element.msRequestFullscreen();
+    }
+}
+
 // 全局视频结束处理函数
 window.handleVideoEnd = function() {
     const state = window.playState;
+    console.log('视频结束，当前播放模式:', state.playMode, 'API:', state.randomCategoryApi);
+    
+    // 记录当前是否全屏
+    const wasFullscreen = isFullscreen();
     
     if (state.playMode === 'randomCategory' && state.randomCategoryApi) {
+        console.log('执行随机分类连续播放');
         // 随机分类模式：自动播放下一个随机视频
         const timestamp = new Date().getTime();
         const newUrl = state.randomCategoryApi + '?t=' + timestamp;
@@ -458,10 +483,23 @@ window.handleVideoEnd = function() {
         
         // 播放新视频
         play.load(newUrl);
+        
+        // 如果之前是全屏状态，恢复全屏
+        if (wasFullscreen) {
+            const videoElement = document.getElementById('real_video_player') || 
+                                document.getElementById('video_player');
+            if (videoElement) {
+                // 延迟执行确保视频元素已准备好
+                setTimeout(() => {
+                    requestFullscreen(videoElement);
+                }, 300);
+            }
+        }
     } else if (state.playMode === 'playlist' && 
                state.currentPlaylist && 
                state.currentIndex !== -1 && 
                state.currentPlaylist.length) {
+        console.log('执行播放列表连续播放');
         // 播放列表模式：播放下一个条目
         const nextIndex = (state.currentIndex + 1) % state.currentPlaylist.length;
         const nextEntry = state.currentPlaylist[nextIndex];
@@ -480,7 +518,21 @@ window.handleVideoEnd = function() {
             const nextItem = document.querySelector(`.entry-item[data-index="${nextIndex}"]`);
             if (nextItem) {
                 nextItem.classList.add('active');
-                playSelectedMedia(nextEntry.url);
+                // 播放选中的媒体
+                document.getElementById('url_box').value = nextEntry.url;
+                document.getElementById('url_btn').click();
+                
+                // 如果之前是全屏状态，恢复全屏
+                if (wasFullscreen) {
+                    const videoElement = document.getElementById('real_video_player') || 
+                                        document.getElementById('video_player');
+                    if (videoElement) {
+                        // 延迟执行确保视频元素已准备好
+                        setTimeout(() => {
+                            requestFullscreen(videoElement);
+                        }, 300);
+                    }
+                }
             }
         }
     }
