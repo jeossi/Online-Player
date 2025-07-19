@@ -384,6 +384,7 @@ function selectCategory(category, entries) {
 }
 
 // 渲染条目列表
+// 在渲染条目列表时正确设置播放模式
 function renderEntries(entries) {
     if (!entriesGrid) return;
     
@@ -393,6 +394,10 @@ function renderEntries(entries) {
         entriesGrid.innerHTML = '<div class="entry-item">该分类下没有内容</div>';
         return;
     }
+    
+    // 检查当前分类是否为随机分类
+    const isRandomCategory = window.playState.currentCategory && 
+                            window.playState.currentCategory.includes('随机');
     
     entries.forEach((entry, index) => {
         const entryItem = document.createElement('div');
@@ -413,16 +418,13 @@ function renderEntries(entries) {
             window.playState.currentPlaylist = entries;
             window.playState.currentIndex = index;
             
-            // 判断当前分类是否为随机分类
-            const isRandomCategory = window.playState.currentCategory && 
-                                    window.playState.currentCategory.includes('随机');
-            
             // 设置播放模式
             window.playState.playMode = isRandomCategory ? 'randomCategory' : 'playlist';
             
             // 如果是随机分类，保存基础API地址
             if (isRandomCategory) {
                 window.playState.randomCategoryApi = entry.url.split('?')[0];
+                console.log('设置为随机分类模式，API:', window.playState.randomCategoryApi);
             }
             
             // 播放选中的媒体
