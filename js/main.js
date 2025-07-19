@@ -245,6 +245,16 @@ var play = {
                     break;
             }
             player.vControl('p+');
+            
+            // 显示/隐藏连续播放提示
+            const indicator = document.getElementById('auto-play-indicator');
+            if (indicator) {
+                // 根据播放模式显示提示
+                const playMode = window.playState ? window.playState.playMode : null;
+                indicator.style.display = 
+                    (playMode === 'randomCategory') ? 'block' : 'none';
+            }
+            
             log.add(url);
             console.log('视频资源加载成功');
             
@@ -607,8 +617,67 @@ var page = {
         this.init();
         this.pretreat();
         this.instruct();
+        
+        // 初始化全局播放状态
+        if (!window.playState) {
+            window.playState = {
+                currentPlaylist: [],
+                currentIndex: -1,
+                currentUrl: null,
+                currentCategory: '',        // 当前选中的分类名称
+                channelsData: [],
+                currentChannelData: null,
+                playMode: 'playlist',       // 播放模式：'playlist' 或 'randomCategory'
+                randomCategoryApi: ''       // 随机分类的基础API地址
+            };
+        }
     }
 };
+
 $(document).ready(function() {
     page.onload();
-})
+});
+
+// 全局视频结束处理函数
+window.handleVideoEnd = function() {
+    const state = window.playState;
+    
+    if (state.playMode === 'randomCategory' && state.randomCategoryApi) {
+        // 随机分类模式：自动播放下一个随机视频
+        const timestamp = new Date().getTime();
+        const newUrl = state.randomCategoryApi + '?t=' + timestamp;
+        
+        // 更新输入框
+        document.getElementById('url_box').value = newUrl;
+        
+        // 播放新视频
+        play.load(newUrl);
+    } else if (state.playMode === 'playlist' && 
+               state.currentPlaylist && 
+               state.currentIndex !== -1 && 
+               state.currentPlaylist.length) {
+        // 播放列表模式：播放下一个条目
+        const nextIndex = (state.currentIndex + 1) % state.currentPlaylist.length;
+        const nextEntry = state.currentPlaylist[nextIndex];
+        
+        if (nextEntry) {
+            // 更新全局状态
+            state.currentIndex = nextIndex;
+            state.currentUrl = nextEntry.url;
+            
+            // 更新UI
+            document.querySelectorAll('.entry-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            
+            // 找到并激活下一个条目
+            const nextItem = document.querySelector(`.entry-item[data-index="${nextIndex}"]`);
+            if (nextItem) {
+                nextItem.classList.add('active');
+                // 播放选中的媒体
+                document.getElementById('url_box').value = nextEntry.url;
+                document.getElementById('url_btn').click();
+            }
+        }
+    }
+};
