@@ -210,6 +210,8 @@ function renderChannels(channels) {
         li.textContent = channel.name;
         
         li.addEventListener('click', () => {
+            // 切换线路前销毁播放器
+            play.destroyPlayer();
             selectChannel(channel);
         });
         
@@ -356,6 +358,8 @@ function renderCategories(categories) {
         categoryContainer.textContent = category;
         
         categoryContainer.addEventListener('click', () => {
+            // 切换分类前销毁播放器
+            play.destroyPlayer();
             selectCategory(category, categories[category]);
         });
         
@@ -398,11 +402,20 @@ function renderEntries(entries) {
     const isRandomCategory = window.playState.currentCategory && 
                             window.playState.currentCategory.includes('随机');
     
+    // 保存当前播放状态以便恢复
+    const prevPlaylist = window.playState.currentPlaylist || [];
+    const prevIndex = window.playState.currentIndex;
+    
     entries.forEach((entry, index) => {
         const entryItem = document.createElement('div');
         entryItem.className = 'entry-item';
         entryItem.dataset.index = index;
         entryItem.innerHTML = `<div class="entry-name">${entry.name}</div>`;
+        
+        // 如果这个条目是之前播放的，标记为活动状态
+        if (prevPlaylist === entries && prevIndex === index) {
+            entryItem.classList.add('active');
+        }
         
         entryItem.addEventListener('click', () => {
             // 移除之前选中的条目
@@ -420,9 +433,9 @@ function renderEntries(entries) {
             // 设置播放模式
             window.playState.playMode = isRandomCategory ? 'randomCategory' : 'playlist';
             
-            // 如果是随机分类，保存基础API地址
+            // 如果是随机分类，保存完整的URL作为基础API地址
             if (isRandomCategory) {
-                window.playState.randomCategoryApi = entry.url.split('?')[0];
+                window.playState.randomCategoryApi = entry.url;
                 console.log('设置为随机分类模式，API:', window.playState.randomCategoryApi);
             }
             
@@ -436,107 +449,9 @@ function renderEntries(entries) {
 
 // 播放选中的媒体
 function playSelectedMedia(url) {
-    // 更新URL输入框
-    document.getElementById('url_box').value = url;
-    
-    // 触发播放按钮点击事件
-    document.getElementById('url_btn').click();
+    // 使用新的更新方法而不是触发按钮点击
+    play.updateSource(url);
 }
-
-// 检查是否全屏
-function isFullscreen() {
-    return document.fullscreenElement || 
-           document.webkitFullscreenElement || 
-           document.mozFullScreenElement || 
-           document.msFullscreenElement;
-}
-
-// 请求全屏
-function requestFullscreen(element) {
-    if (element.requestFullscreen) {
-        element.requestFullscreen();
-    } else if (element.webkitRequestFullscreen) {
-        element.webkitRequestFullscreen();
-    } else if (element.mozRequestFullScreen) {
-        element.mozRequestFullScreen();
-    } else if (element.msRequestFullscreen) {
-        element.msRequestFullscreen();
-    }
-}
-
-// 全局视频结束处理函数
-window.handleVideoEnd = function() {
-    const state = window.playState;
-    console.log('视频结束，当前播放模式:', state.playMode, 'API:', state.randomCategoryApi);
-    
-    // 记录当前是否全屏
-    const wasFullscreen = isFullscreen();
-    
-    if (state.playMode === 'randomCategory' && state.randomCategoryApi) {
-        console.log('执行随机分类连续播放');
-        // 随机分类模式：自动播放下一个随机视频
-        const timestamp = new Date().getTime();
-        const newUrl = state.randomCategoryApi + '?t=' + timestamp;
-        
-        // 更新输入框
-        document.getElementById('url_box').value = newUrl;
-        
-        // 播放新视频
-        play.load(newUrl);
-        
-        // 如果之前是全屏状态，恢复全屏
-        if (wasFullscreen) {
-            const videoElement = document.getElementById('real_video_player') || 
-                                document.getElementById('video_player');
-            if (videoElement) {
-                // 延迟执行确保视频元素已准备好
-                setTimeout(() => {
-                    requestFullscreen(videoElement);
-                }, 300);
-            }
-        }
-    } else if (state.playMode === 'playlist' && 
-               state.currentPlaylist && 
-               state.currentIndex !== -1 && 
-               state.currentPlaylist.length) {
-        console.log('执行播放列表连续播放');
-        // 播放列表模式：播放下一个条目
-        const nextIndex = (state.currentIndex + 1) % state.currentPlaylist.length;
-        const nextEntry = state.currentPlaylist[nextIndex];
-        
-        if (nextEntry) {
-            // 更新全局状态
-            state.currentIndex = nextIndex;
-            state.currentUrl = nextEntry.url;
-            
-            // 更新UI
-            document.querySelectorAll('.entry-item').forEach(item => {
-                item.classList.remove('active');
-            });
-            
-            // 找到并激活下一个条目
-            const nextItem = document.querySelector(`.entry-item[data-index="${nextIndex}"]`);
-            if (nextItem) {
-                nextItem.classList.add('active');
-                // 播放选中的媒体
-                document.getElementById('url_box').value = nextEntry.url;
-                document.getElementById('url_btn').click();
-                
-                // 如果之前是全屏状态，恢复全屏
-                if (wasFullscreen) {
-                    const videoElement = document.getElementById('real_video_player') || 
-                                        document.getElementById('video_player');
-                    if (videoElement) {
-                        // 延迟执行确保视频元素已准备好
-                        setTimeout(() => {
-                            requestFullscreen(videoElement);
-                        }, 300);
-                    }
-                }
-            }
-        }
-    }
-};
 
 // 初始化播放列表
 document.addEventListener('DOMContentLoaded', () => {
