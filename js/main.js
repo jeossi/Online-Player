@@ -206,7 +206,20 @@ var play = {
     currentUrl: null,
     isSwitchingSource: false, // 添加切换状态标志
     
+    isMobileDevice: function() {
+        return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    },
+    
+    isRandomCategoryMode: function() {
+        return window.playState && window.playState.playMode === 'randomCategory';
+    },
+    
     destroyPlayer: function() {
+        // 如果是随机连续播放模式并且是移动设备，我们不销毁播放器，因为要复用video元素
+        if (this.isRandomCategoryMode() && this.isMobileDevice()) {
+            return;
+        }
+        
         if (this.currentPlayer) {
             try {
                 if (this.currentPlayer.destroy) {
@@ -247,10 +260,35 @@ var play = {
         try {
             console.log('正在更新视频源:', url);
             
+            // 获取video元素
+            const videoElement = document.getElementById('real_video_player') || $('#video_player')[0];
+            
+            // 如果是随机连续播放模式并且是移动设备，采用直接更新src的方式
+            if (this.isRandomCategoryMode() && this.isMobileDevice()) {
+                // 停止并销毁当前播放器（如果存在，但注意destroyPlayer中已经跳过销毁）
+                this.destroyPlayer();
+                
+                // 直接设置src并播放
+                videoElement.src = url;
+                videoElement.load();
+                videoElement.play().catch(e => console.log('播放失败:', e));
+                
+                // 更新当前播放URL
+                this.currentUrl = url;
+                
+                // 添加播放历史
+                log.add(url);
+                
+                // 重新绑定结束事件
+                videoElement.removeEventListener('ended', window.handleVideoEnd);
+                videoElement.addEventListener('ended', window.handleVideoEnd);
+                
+                // 注意：移动设备上我们不尝试恢复全屏，由浏览器自动处理
+                return;
+            }
+            
             // 停止并销毁当前播放器
             this.destroyPlayer();
-            
-            const videoElement = document.getElementById('real_video_player') || $('#video_player')[0];
             
             switch (sourceType) {
                 case 'm3u8':
@@ -301,8 +339,8 @@ var play = {
             videoElement.removeEventListener('ended', window.handleVideoEnd);
             videoElement.addEventListener('ended', window.handleVideoEnd);
             
-            // 恢复全屏状态
-            if (wasFullscreen && fullscreenElement) {
+            // 恢复全屏状态（仅限桌面设备）
+            if (wasFullscreen && fullscreenElement && !this.isMobileDevice()) {
                 setTimeout(() => {
                     this.requestFullscreen(fullscreenElement);
                 }, 300);
@@ -347,6 +385,26 @@ var play = {
             
             player = this.init(player);
             const videoElement = player[0];
+            
+            // 如果是随机连续播放模式并且是移动设备，采用直接更新src的方式
+            if (this.isRandomCategoryMode() && this.isMobileDevice()) {
+                videoElement.src = url;
+                videoElement.load();
+                videoElement.play().catch(e => console.log('播放失败:', e));
+                
+                // 更新当前播放URL
+                this.currentUrl = url;
+                
+                // 添加播放历史
+                log.add(url);
+                
+                // 重新绑定结束事件
+                videoElement.removeEventListener('ended', window.handleVideoEnd);
+                videoElement.addEventListener('ended', window.handleVideoEnd);
+                
+                // 注意：移动设备上我们不尝试恢复全屏，由浏览器自动处理
+                return;
+            }
             
             switch (sourceType) {
                 case 'm3u8':
@@ -395,8 +453,8 @@ var play = {
                 window.playState.currentUrl = url;
             }
             
-            // 恢复全屏状态
-            if (wasFullscreen && fullscreenElement) {
+            // 恢复全屏状态（仅限桌面设备）
+            if (wasFullscreen && fullscreenElement && !this.isMobileDevice()) {
                 setTimeout(() => {
                     this.requestFullscreen(fullscreenElement);
                 }, 300);
@@ -419,6 +477,12 @@ var play = {
     },
     
     init: function(player) {
+        // 如果已经存在real_video_player，则直接返回该元素
+        let existingPlayer = document.getElementById('real_video_player');
+        if (existingPlayer) {
+            return $(existingPlayer);
+        }
+        
         if (!player[0]) {
             console.error('play.init(player)参数错误:player必选');
             return false;
@@ -779,8 +843,8 @@ window.handleVideoEnd = function() {
         // 使用新的更新方法
         play.updateSource(newUrl);
         
-        // 恢复全屏状态
-        if (wasFullscreen && fullscreenElement) {
+        // 恢复全屏状态（仅限桌面设备）
+        if (wasFullscreen && fullscreenElement && !play.isMobileDevice()) {
             setTimeout(() => {
                 play.requestFullscreen(fullscreenElement);
             }, 300);
@@ -811,8 +875,8 @@ window.handleVideoEnd = function() {
                 // 使用新的更新方法
                 play.updateSource(nextEntry.url);
                 
-                // 恢复全屏状态
-                if (wasFullscreen && fullscreenElement) {
+                // 恢复全屏状态（仅限桌面设备）
+                if (wasFullscreen && fullscreenElement && !play.isMobileDevice()) {
                     setTimeout(() => {
                         play.requestFullscreen(fullscreenElement);
                     }, 300);
