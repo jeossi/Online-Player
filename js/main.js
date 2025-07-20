@@ -204,25 +204,136 @@ var link = {
 var play = {
     currentPlayer: null,
     currentUrl: null,
+    isSwitchingSource: false, // 添加切换状态标志
     
-    load: function(url) {
-        // 销毁之前的播放器实例
-        if (play.currentPlayer) {
-            if (play.currentPlayer.destroy) {
-                play.currentPlayer.destroy();
-            } else if (play.currentPlayer.dispose) {
-                play.currentPlayer.dispose();
+    destroyPlayer: function() {
+        if (this.currentPlayer) {
+            try {
+                if (this.currentPlayer.destroy) {
+                    this.currentPlayer.destroy();
+                } else if (this.currentPlayer.dispose) {
+                    this.currentPlayer.dispose();
+                } else if (this.currentPlayer.unload) {
+                    this.currentPlayer.unload();
+                }
+            } catch (e) {
+                console.error('销毁播放器失败:', e);
             }
-            play.currentPlayer = null;
+            this.currentPlayer = null;
         }
         
-        // 重置视频元素
-        var playerElement = document.getElementById('video_player');
-        if (playerElement) {
-            playerElement.pause();
-            playerElement.src = '';
-            playerElement.load();
+        const videoElement = document.getElementById('real_video_player');
+        if (videoElement) {
+            videoElement.pause();
+            videoElement.src = '';
+            videoElement.load();
         }
+    },
+    
+    updateSource: function(url) {
+        // 设置切换状态标志
+        this.isSwitchingSource = true;
+        
+        // 记录当前全屏状态
+        const wasFullscreen = this.isFullscreen();
+        const fullscreenElement = this.getFullscreenElement();
+        
+        const sourceType = link.check(url);
+        if (!sourceType) return false;
+        
+        url = decodeURIComponent(url);
+        url = link.convert(url);
+        
+        try {
+            console.log('正在更新视频源:', url);
+            
+            // 停止并销毁当前播放器
+            this.destroyPlayer();
+            
+            const videoElement = document.getElementById('real_video_player') || $('#video_player')[0];
+            
+            switch (sourceType) {
+                case 'm3u8':
+                    if (Hls.isSupported()) {
+                        const hls = new Hls();
+                        hls.loadSource(url);
+                        hls.attachMedia(videoElement);
+                        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                            videoElement.play().catch(e => console.log('HLS播放失败:', e));
+                        });
+                        this.currentPlayer = hls;
+                    } else if (videoElement.canPlayType('application/vnd.apple.mpegurl')) {
+                        videoElement.src = url;
+                        videoElement.play().catch(e => console.log('HLS播放失败:', e));
+                    }
+                    break;
+                    
+                case 'flv':
+                    if (flvjs.isSupported()) {
+                        const flvPlayer = flvjs.createPlayer({
+                            type: 'flv',
+                            url: url
+                        });
+                        flvPlayer.attachMediaElement(videoElement);
+                        flvPlayer.load();
+                        videoElement.play().catch(e => console.log('FLV播放失败:', e));
+                        this.currentPlayer = flvPlayer;
+                    }
+                    break;
+                    
+                default:
+                    videoElement.src = url;
+                    videoElement.play().catch(e => console.log('普通视频播放失败:', e));
+            }
+            
+            // 更新当前播放URL
+            this.currentUrl = url;
+            
+            // 更新全局播放状态
+            if (window.playState) {
+                window.playState.currentUrl = url;
+            }
+            
+            // 添加播放历史
+            log.add(url);
+            
+            // 重新绑定结束事件
+            videoElement.removeEventListener('ended', window.handleVideoEnd);
+            videoElement.addEventListener('ended', window.handleVideoEnd);
+            
+            // 恢复全屏状态
+            if (wasFullscreen && fullscreenElement) {
+                setTimeout(() => {
+                    this.requestFullscreen(fullscreenElement);
+                }, 300);
+            }
+        } catch (e) {
+            console.error('更新视频源失败:', e);
+        } finally {
+            // 显示/隐藏连续播放提示
+            const indicator = document.getElementById('auto-play-indicator');
+            if (indicator) {
+                const playMode = window.playState ? window.playState.playMode : null;
+                indicator.style.display = 
+                    (playMode === 'randomCategory') ? 'block' : 'none';
+                console.log('设置连续播放提示:', indicator.style.display, '播放模式:', playMode);
+            }
+            
+            // 重置切换状态标志
+            this.isSwitchingSource = false;
+        }
+    },
+    
+    load: function(url) {
+        // 设置切换状态标志
+        this.isSwitchingSource = true;
+        
+        // 记录当前全屏状态
+        const wasFullscreen = this.isFullscreen();
+        const fullscreenElement = this.getFullscreenElement();
+        
+        // 销毁之前的播放器实例
+        this.destroyPlayer();
         
         url = url ? url : link.get();
         var player = $('#video_player');
@@ -233,42 +344,77 @@ var play = {
         try {
             console.log('正在加载视频资源:' + url);
             url = decodeURIComponent(url);
+            
+            player = this.init(player);
+            const videoElement = player[0];
+            
             switch (sourceType) {
                 case 'm3u8':
-                    player = play.m3u8(url, player);
+                    if (Hls.isSupported()) {
+                        const hls = new Hls();
+                        hls.loadSource(url);
+                        hls.attachMedia(videoElement);
+                        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                            videoElement.play().catch(e => console.log('HLS播放失败:', e));
+                        });
+                        this.currentPlayer = hls;
+                    } else if (videoElement.canPlayType('application/vnd.apple.mpegurl')) {
+                        videoElement.src = url;
+                        videoElement.play().catch(e => console.log('HLS播放失败:', e));
+                    } else {
+                        console.error('浏览器不支持HLS播放');
+                    }
                     break;
                 case 'flv':
-                    player = play.flv(url, player);
+                    if (flvjs.isSupported()) {
+                        const flvPlayer = flvjs.createPlayer({
+                            type: 'flv',
+                            url: url
+                        });
+                        flvPlayer.attachMediaElement(videoElement);
+                        flvPlayer.load();
+                        videoElement.play().catch(e => console.log('FLV播放失败:', e));
+                        this.currentPlayer = flvPlayer;
+                    } else {
+                        console.error('浏览器不支持FLV播放');
+                    }
                     break;
                 default:
-                    player = play.default(url, player);
-                    break;
-            }
-            player.vControl('p+');
-            
-            // 显示/隐藏连续播放提示
-            const indicator = document.getElementById('auto-play-indicator');
-            if (indicator) {
-                // 根据播放模式显示提示
-                const playMode = window.playState ? window.playState.playMode : null;
-                indicator.style.display = 
-                    (playMode === 'randomCategory') ? 'block' : 'none';
-                
-                console.log('设置连续播放提示:', indicator.style.display, '播放模式:', playMode);
+                    videoElement.src = url;
+                    videoElement.play().catch(e => console.log('普通视频播放失败:', e));
             }
             
             log.add(url);
             console.log('视频资源加载成功');
             
             // 更新当前播放URL
-            play.currentUrl = url;
+            this.currentUrl = url;
             
             // 更新全局播放状态
             if (window.playState) {
                 window.playState.currentUrl = url;
             }
+            
+            // 恢复全屏状态
+            if (wasFullscreen && fullscreenElement) {
+                setTimeout(() => {
+                    this.requestFullscreen(fullscreenElement);
+                }, 300);
+            }
         } catch (e) {
-            console.log('找不到视频资源或不支持该视频格式!');
+            console.log('找不到视频资源或不支持该视频格式!', e);
+        } finally {
+            // 显示/隐藏连续播放提示
+            const indicator = document.getElementById('auto-play-indicator');
+            if (indicator) {
+                const playMode = window.playState ? window.playState.playMode : null;
+                indicator.style.display = 
+                    (playMode === 'randomCategory') ? 'block' : 'none';
+                console.log('设置连续播放提示:', indicator.style.display, '播放模式:', playMode);
+            }
+            
+            // 重置切换状态标志
+            this.isSwitchingSource = false;
         }
     },
     
@@ -315,7 +461,7 @@ var play = {
         });
         videoBox.append(newPlayer);
         
-        // 绑定结束事件 - 确保使用正确的播放器元素
+        // 绑定结束事件
         newPlayer[0].addEventListener('ended', function() {
             if (window.handleVideoEnd) {
                 window.handleVideoEnd();
@@ -324,82 +470,42 @@ var play = {
         
         return newPlayer;
     },
-    m3u8: function(url, player) {
-        if (!url || !player[0]) {
-            console.log('play.m3u8(url,player)参数错误:url必选,player必选');
-            return false;
-        }
-        this.check(url);
-        url = link.convert(url);
-        
-        // 尝试使用HLS播放器
-        if (Hls.isSupported()) {
-            try {
-                player = this.init(player);
-                var hlsPlayer = new Hls();
-                hlsPlayer.loadSource(url);
-                hlsPlayer.attachMedia(player[0]);
-                hlsPlayer.on(Hls.Events.MANIFEST_PARSED, function() {
-                    // 播放器加载成功
-                });
-                play.currentPlayer = hlsPlayer;
-                return player;
-            } catch (e) {
-                console.error('HLS播放器初始化失败:', e);
-            }
-        }
-        
-        // 回退到普通video标签
-        console.log('浏览器不支持HLS播放器，尝试使用普通video标签播放');
-        return this.default(url, player);
-    },
-    flv: function(url, player) {
-        if (!url || !player[0]) {
-            console.log('play.flv(url,player)参数错误:url必选,player必选');
-            return false;
-        }
-        this.check(url);
-        url = link.convert(url);
-        
-        // 尝试使用FLV播放器
-        if (flvjs.isSupported()) {
-            try {
-                player = this.init(player);
-                var flvPlayer = flvjs.createPlayer({
-                    type: 'flv',
-                    url: url
-                });
-                flvPlayer.attachMediaElement(player[0]);
-                flvPlayer.load();
-                play.currentPlayer = flvPlayer;
-                return player;
-            } catch (e) {
-                console.error('FLV播放器初始化失败:', e);
-            }
-        }
-        
-        // 回退到普通video标签
-        console.log('浏览器不支持FLV播放器，尝试使用普通video标签播放');
-        return this.default(url, player);
-    },
-    default: function(url, player) {
-        if (!url || !player[0]) {
-            console.log('play.default(url,player)参数错误:url必选,player必选');
-            return false;
-        }
-        player = this.init(player);
-        url = link.convert(url);
-        player[0].src = url;
-        play.currentPlayer = null;
-        return player;
-    },
+    
     check: function(url) {
         if (location.hostname.search('.rth.') !== -1) {
             location.href = 'https://icedwatermelonjuice.github.io/Online-Player?url=' + url;
         }
     },
+    
     on: function() {
         this.load($('#url_box').val());
+    },
+    
+    // 全屏工具函数
+    isFullscreen: function() {
+        return document.fullscreenElement || 
+               document.webkitFullscreenElement || 
+               document.mozFullScreenElement || 
+               document.msFullscreenElement;
+    },
+    
+    getFullscreenElement: function() {
+        return document.fullscreenElement || 
+               document.webkitFullscreenElement || 
+               document.mozFullScreenElement || 
+               document.msFullscreenElement;
+    },
+    
+    requestFullscreen: function(element) {
+        if (element.requestFullscreen) {
+            element.requestFullscreen();
+        } else if (element.webkitRequestFullscreen) {
+            element.webkitRequestFullscreen();
+        } else if (element.mozRequestFullScreen) {
+            element.mozRequestFullScreen();
+        } else if (element.msRequestFullscreen) {
+            element.msRequestFullscreen();
+        }
     }
 };
 
@@ -642,20 +748,43 @@ $(document).ready(function() {
 
 // 全局视频结束处理函数
 window.handleVideoEnd = function() {
+    // 如果当前正在切换源，则跳过结束处理
+    if (play.isSwitchingSource) {
+        console.log('正在切换源，跳过结束处理');
+        return;
+    }
+    
     const state = window.playState;
     console.log('视频结束，当前播放模式:', state.playMode, 'API:', state.randomCategoryApi);
+    
+    // 记录当前是否全屏
+    const wasFullscreen = play.isFullscreen();
+    const fullscreenElement = play.getFullscreenElement();
     
     if (state.playMode === 'randomCategory' && state.randomCategoryApi) {
         console.log('执行随机分类连续播放');
         // 随机分类模式：自动播放下一个随机视频
         const timestamp = new Date().getTime();
-        const newUrl = state.randomCategoryApi + '?t=' + timestamp;
+        let newUrl = state.randomCategoryApi;
         
-        // 更新输入框
-        document.getElementById('url_box').value = newUrl;
+        // 添加时间戳参数，避免缓存
+        if (newUrl.includes('?')) {
+            newUrl += '&t=' + timestamp;
+        } else {
+            newUrl += '?t=' + timestamp;
+        }
         
-        // 播放新视频
-        play.load(newUrl);
+        console.log('生成新的随机URL:', newUrl);
+        
+        // 使用新的更新方法
+        play.updateSource(newUrl);
+        
+        // 恢复全屏状态
+        if (wasFullscreen && fullscreenElement) {
+            setTimeout(() => {
+                play.requestFullscreen(fullscreenElement);
+            }, 300);
+        }
     } else if (state.playMode === 'playlist' && 
                state.currentPlaylist && 
                state.currentIndex !== -1 && 
@@ -679,9 +808,15 @@ window.handleVideoEnd = function() {
             const nextItem = document.querySelector(`.entry-item[data-index="${nextIndex}"]`);
             if (nextItem) {
                 nextItem.classList.add('active');
-                // 播放选中的媒体
-                document.getElementById('url_box').value = nextEntry.url;
-                document.getElementById('url_btn').click();
+                // 使用新的更新方法
+                play.updateSource(nextEntry.url);
+                
+                // 恢复全屏状态
+                if (wasFullscreen && fullscreenElement) {
+                    setTimeout(() => {
+                        play.requestFullscreen(fullscreenElement);
+                    }, 300);
+                }
             }
         }
     }
